@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-//const path = require('path');
+const path = require('path');
 const mysql = require('mysql2/promise');
 require ("dotenv").config();
 
@@ -17,12 +17,7 @@ server.listen(port, ()=>{
 
 
 
-/*manejar errores de rutas que no existen
 
-server.get("*", (req, res)=>{
-
-    res.status(404).sendFile(path.join(__dirname, '../web/not-found.html'));
-});*/
 
 
 async function getConnectionDB() {
@@ -80,6 +75,42 @@ server.get("/books", async (req, res)=>{
  }
   });
 
+  //Buscar receta por id
+
+  server.get("/books/:id", async (req, res)=>{
+    const id= req.params.id;
+    const conex= await getConnectionDB();
+    const sql= "SELECT * FROM books where id=?";
+    const [result]= await conex.query(sql, [id]);
+    conex.end();
+    res.status(200).json({
+      success:true,
+      result:result[0],
+
+    });
+  });
+
+  //Buscar libros que estan disponibles en la biblioteca
+
+  server.get("/books/available", async (req, res)=>{
+    try{
+    const available= req.query.available;
+    const conex= await getConnectionDB();
+    const sql= "SELECT * FROM books where available=?";
+    const [result]= await conex.query(sql,[available]);
+    conex.end();
+    res.status(200).json({
+      success: true,
+      result: result,
+    })
+  }catch(error){
+    res.status (500).json({
+      success:false,
+      message: "Error en la búsqueda"
+    });
+  }
+  });
+
   //Actulizar una entrada existente por id (modifique id=1 cambié la categoría)
 
   server.put("/books/:id", async (req,res)=>{
@@ -95,3 +126,27 @@ server.get("/books", async (req, res)=>{
     });
   });
 
+  server.delete("/books/delete/:id", async (req, res)=>{
+    const id= req.params.id;
+    const conex= await getConnectionDB();
+    const sql= "DELETE FROM books WHERE id=?";
+    const [result]= await conex.query(sql, [id])
+    if(result.affectedRows >0){
+      res.status(200).json({
+        success:true,
+        message: "Actualizado con éxito"
+      });
+    }else{
+      res.status(500).json({
+        success:false,
+        message: "No pudo eliminarse"
+      });
+    }
+  });
+
+//manejar errores de rutas que no existen
+
+server.get("*", (req, res)=>{
+
+  res.status(404).sendFile(path.join(__dirname, '../web/not-found.html'));
+});
