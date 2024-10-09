@@ -71,6 +71,7 @@ server.get("/books", async (req, res)=>{
     result: result,
   });
  }catch(error){
+  console.log(error)
   res.status (500).json({
     success:false,
     message: "Error interno del servidor"
