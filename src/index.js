@@ -2,7 +2,9 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const mysql = require('mysql2/promise');
+const bcrypt= require('bcrypt');
 require ("dotenv").config();
+
 
 //crear servidor
 const server= express();
@@ -92,7 +94,7 @@ server.get("/books", async (req, res)=>{
 
   //Buscar libros que estan disponibles en la biblioteca
 
-  server.get("/books/available", async (req, res)=>{
+  server.get("/book/available", async (req, res)=>{
     try{
     const available= req.query.available;
     const conex= await getConnectionDB();
@@ -126,6 +128,7 @@ server.get("/books", async (req, res)=>{
     });
   });
 
+  //Eliminar por id
   server.delete("/books/delete/:id", async (req, res)=>{
     const id= req.params.id;
     const conex= await getConnectionDB();
@@ -143,6 +146,35 @@ server.get("/books", async (req, res)=>{
       });
     }
   });
+
+  //Registrar nuevo usuario
+
+  server.post("/library/register", async (req, res)=>{
+  const{email,name,password}= req.body;
+  const conex= await getConnectionDB();
+  const querySelect= "SELECT * FROM users_db WHERE email=?"
+  const [resultSelect]= await conex.query(querySelect, [email])
+  if(resultSelect.length===0){
+    const passHashed= await bcrypt.hash(password,10);
+    const queryInsert= "INSERT INTO users_db (email, name, password) values (?,?,?)";
+    const [resultUser]= await conex.query(queryInsert, [email, name, passHashed]);
+    res.status(201).json({
+      success: true,
+      result: resultUser.insertId
+    });
+    console.log(resultUser);
+  }else{
+    res.status(200).json({
+      success: false,
+      error: 'error'
+    })
+  }
+  conex.end();
+  });
+
+  //login
+
+  
 
 //manejar errores de rutas que no existen
 
