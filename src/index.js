@@ -3,6 +3,7 @@ const cors = require('cors');
 const path = require('path');
 const mysql = require('mysql2/promise');
 const bcrypt= require('bcrypt');
+const jwt= require('jsonwebtoken');
 require ("dotenv").config();
 
 
@@ -174,7 +175,106 @@ server.get("/books", async (req, res)=>{
 
   //login
 
-  
+  server.post("/library/login", async(req, res)=>{
+    const conex= await getConnectionDB();
+    const{email,password}=req.body
+    const queryEmail= "SELECT * FROM users_db WHERE email=?";
+    const [userResult]= await conex.query(queryEmail,[email]);
+    conex.end();
+    
+    if(userResult.length>0){
+      const isSamePassword= await bcrypt.compare(password, userResult[0].password)
+      
+      if (isSamePassword){
+        const infoToken={
+          id: userResult[0].id,
+          email: userResult[0].email,
+        };
+        
+        //generar el token
+        const token= jwt.sign(infoToken, process.env.SECRET_KEY, {expiresIn:'1h'});
+        res.status(200).json({
+          success:true,
+          token: token}); 
+        
+      }else{
+        res.status(403).json({
+          success:false,
+          error: "error"
+        });
+      }
+    }else{
+      res.status(404).json({
+        success:false,
+        message:"usuario no existe"
+      });
+    }
+  });
+
+  //autorizacion
+  async function authorize(req, res, next){
+    const tokenBearer= req.headers.authorization;
+    if(!tokenBearer){
+      res.status(400).json({
+        success:false,
+        message: "No estas autorizado para iniciar sesión"
+      })
+    }else{
+      //const arrayToken= tokenBearer.split(" ")[1];
+      const arrayToken= tokenBearer.split(" ");
+      const token= arrayToken[1];
+
+      const tokenInfo= jwt.verify(token, process.env.SECRET_KEY);
+      if(!tokenInfo.email){
+        res.status(400).json({
+          success: false,
+          message: "No estás autenticado"
+        });
+      }else{
+        const conex= await getConnectionDB();
+        const sql= "SELECT * FROM users_db WHERE email=?"
+        const [result]= await conex.query(sql, [tokenInfo.email])
+        conex.end();
+        if(result.length>0){
+          req.infoUser= result[0]
+          next()
+        }else{
+          res.status(400).json({
+            success: false,
+            message: "No autenticado"
+          });
+          
+        };
+      };
+    };
+  };
+
+  server.get("/library/profileUsers", authorize, async(req, res)=>{
+    const userInfo= req.infoUser;
+    const conex= await getConnectionDB();
+    const sql= "SELECT * FROM users_db WHERE id=?"
+    const [result]=await conex.query(sql, [userInfo.id]);
+    res.json({
+      success:true,
+      message: result[0],
+    });
+  });
+
+  //Consultar los libros del usuario 6 que ha iniciado la sesión
+
+  server.get("/library/SelectProfile", authorize, async (req, res)=>{
+    const userInfo= req.infoUser;
+    const conex= await getConnectionDB();
+    const sql= "SELECT * FROM books_users where users_id=?"
+    const [resultSelect]= await conex.query(sql, [userInfo.id]);
+    res.json({
+      success: true,
+      message: resultSelect
+    });
+
+  });
+
+
 
 //manejar errores de rutas que no existen
 
